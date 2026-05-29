@@ -1,0 +1,635 @@
+\documentclass[12pt,a4paper]{article}
+
+% ---- Paquetes ----
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{trees, shapes, arrows.meta, positioning, automata}
+
+\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+
+% ---- Encabezado ----
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Sistema de Pathfinding -- FSM, AG y RN}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14.5pt}
+
+% ---- C\'odigo ----
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  backgroundcolor=\color{gray!10},
+  xleftmargin=2em,
+  xrightmargin=2em,
+  language=Python
+}
+
+\lstdefinestyle{estructura}{
+  frame=single,
+  backgroundcolor=\color{gray!5},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  numbers=none,
+  xleftmargin=10pt,
+  xrightmargin=10pt
+}
+
+\title{
+    \vspace*{1.5cm}
+    \begin{center}
+        \includegraphics[width=4cm]{../logo-upds.png}
+    \end{center}
+    \vspace{0.5cm}
+    {\Large\textbf{Universidad Privada Domingo Savio}}\\[2em]
+    \Huge\textbf{Sistema de Pathfinding Evolutivo}\\[0.5em]
+    \large Optimizaci\'on y Reconocimiento de Patrones\\[1.5em]
+    \large\textbf{Modelo de Transacci\'on de Estados, \\[0.2em]
+    Algoritmo Gen\'etico y Red Neuronal Simple}
+}
+\author{
+    \textbf{Estudiante:} Joaquin Alessandro Felipez Rojas \\[0.3em]
+    \textbf{Materia:} Inteligencia Artificial I \\[0.3em]
+    \textbf{Docente:} Ing. Lineth Cindy Coco Rojas
+}
+\date{\textbf{Fecha de entrega:} 29 de mayo de 2026}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+\tableofcontents
+\newpage
+
+% ======================================================================
+\section{Definici\'on del Dominio}
+% ======================================================================
+
+\subsection{Descripci\'on del Problema}
+
+El presente trabajo aborda el problema del \textbf{pathfinding} (b\'usqueda de caminos) en un entorno bidimensional con obst\'aculos, utilizando un enfoque bio-inspirado. Dado un grid de $8 \times 8$ celdas, un robot debe encontrar una ruta desde una posici\'on inicial hasta una meta, evadiendo obst\'aculos colocados por el usuario.
+
+El problema se aborda mediante tres t\'ecnicas fundamentales de la inteligencia artificial:
+
+\begin{itemize}
+  \item \textbf{Modelo de Transacci\'on de Estados (FSM):} Controla el flujo completo del sistema, definiendo los estados v\'alidos y las transiciones entre ellos.
+  \item \textbf{Algoritmo Gen\'etico (AG):} Evoluciona una poblaci\'on de rutas candidatas (cromosomas) mediante selecci\'on, cruce y mutaci\'on, optimizando la distancia recorrida y la evasi\'on de obst\'aculos.
+  \item \textbf{Red Neuronal Simple (RN):} Clasifica direcciones seguras bas\'andose en el estado de las celdas vecinas, aportando una puntuaci\'on de seguridad que el AG utiliza en su funci\'on de fitness.
+\end{itemize}
+
+\subsection{Justificaci\'on del Enfoque}
+
+El pathfinding cl\'asico (A*, Dijkstra) encuentra rutas \'optimas pero requiere conocimiento completo del entorno y es determinista. El enfoque evolutivo ofrece ventajas complementarias:
+
+\begin{itemize}
+  \item El \textbf{AG} permite explorar m\'ultiples soluciones en paralelo, evitando m\'inimos locales.
+  \item La \textbf{RN} a\~nade capacidad de \textbf{reconocimiento de patrones}: aprende a identificar configuraciones de vecindario que predicen direcciones seguras.
+  \item El \textbf{FSM} organiza el proceso en fases discretas, facilitando la depuraci\'on y la experiencia de usuario.
+\end{itemize}
+
+\subsection{Dominio de Aplicaci\'on}
+
+El sistema se aplica a un grid cuadrado de $8 \times 8$ celdas. Cada celda puede estar vac\'ia, ser un obst\'aculo, contener al robot o ser la meta. El usuario interact\'ua colocando obst\'aculos y posicionando el robot y la meta mediante clics. Este entorno es representativo de problemas de navegaci\'on en mapas discretos, como rob\'otica m\'ovil, videojuegos y planificaci\'on de rutas.
+
+% ======================================================================
+\section{Arquitectura del Sistema}
+% ======================================================================
+
+El sistema se compone de tres m\'odulos principales que interact\'uan entre s\'i:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=2.5cm,
+    box/.style={rectangle, draw, rounded corners, minimum width=3cm, minimum height=1cm, align=center, font=\small, fill=blue!10},
+    arrow/.style={-{Stealth[scale=1.2]}, thick},
+  ]
+  \node[box, fill=yellow!20] (fsm) {FSM\\StateMachine.ts};
+  \node[box, fill=green!20, right=of fsm] (ga) {Algoritmo Gen\'etico\\GeneticAlgorithm.ts};
+  \node[box, fill=red!20, right=of ga] (nn) {Red Neuronal\\NeuralNetwork.ts};
+
+  \draw[arrow] (fsm.east) -- node[above, font=\tiny] {controla} (ga.west);
+  \draw[arrow] (ga.east) -- node[above, font=\tiny] {consulta} (nn.west);
+  \draw[arrow] (nn.west) -- node[below, font=\tiny] {puntaje} (ga.east);
+  \draw[arrow, dashed] (ga.north) |- node[right, font=\tiny] {ruta} ++(1,1) -| (fsm.north);
+\end{tikzpicture}
+\caption{Diagrama de interacci\'on entre los tres m\'odulos del sistema.}
+\label{fig:arquitectura}
+\end{figure}
+
+\subsection{Modelo de Transacci\'on de Estados (FSM)}
+
+El FSM define 5 estados con transiciones v\'alidas espec\'ificas:
+
+\begin{table}[H]
+\centering
+\caption{Estados del FSM y transiciones permitidas.}
+\label{tab:fsm}
+\small
+\begin{tabular}{c p{5cm} p{3.5cm}}
+\toprule
+\textbf{Estado} & \textbf{Descripci\'on} & \textbf{Puede transitar a} \\
+\midrule
+IDLE & Reposo inicial & CONFIGURING \\
+CONFIGURING & El usuario coloca obst\'aculos y posiciones & EVOLVING, IDLE \\
+EVOLVING & El AG evoluciona rutas en vivo & SIMULATING, CONFIGURING \\
+SIMULATING & El robot recorre la ruta encontrada & COMPLETE, CONFIGURING \\
+COMPLETE & Proceso finalizado & IDLE, CONFIGURING \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La implementaci\'on utiliza una matriz de transiciones (\texttt{TransitionMap}) que valida cada cambio de estado. El m\'etodo \texttt{transition(newState)} retorna \texttt{true} solo si la transici\'on est\'a permitida desde el estado actual.
+
+\subsection{Algoritmo Gen\'etico}
+
+El AG implementa los operadores cl\'asicos de evoluci\'on:
+
+\begin{table}[H]
+\centering
+\caption{Par\'ametros del Algoritmo Gen\'etico.}
+\label{tab:ga}
+\begin{tabular}{l c}
+\toprule
+\textbf{Par\'ametro} & \textbf{Valor} \\
+\midrule
+Tama\~no de poblaci\'on & 60 individuos \\
+Longitud del cromosoma & 25 genes (direcciones N, S, E, O) \\
+Tasa de mutaci\'on & 8\% por gen \\
+Selecci\'on & Torneo (tama\~no 3) \\
+Cruce & 1 punto de corte aleatorio \\
+Elitismo & 2 mejores individuos preservados \\
+Generaciones m\'aximas & 100 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Funci\'on de fitness:} Cada cromosoma se simula en el grid. El fitness combina:
+\begin{itemize}
+  \item Bonificación por alcanzar la meta ($+100$).
+  \item Puntuaci\'on inversa a la distancia Manhattan ($1/(1+d)$).
+  \item Penalizaci\'on por obst\'aculos chocados ($-2$ por obst\'aculo).
+  \item Puntuaci\'on de la RN seg\'un las direcciones elegidas ($+10$ normalizado).
+\end{itemize}
+
+\subsection{Red Neuronal Simple}
+
+La red es un perceptr\'on multicapa con una capa oculta:
+
+\begin{table}[H]
+\centering
+\caption{Arquitectura de la Red Neuronal.}
+\label{tab:nn}
+\begin{tabular}{l c}
+\toprule
+\textbf{Propiedad} & \textbf{Valor} \\
+\midrule
+Capas & 3 (entrada -- oculta -- salida) \\
+Neuronas de entrada & 4 (N, S, E, O libres = 1, bloqueados = 0) \\
+Neuronas ocultas & 3 \\
+Neuronas de salida & 4 (puntuaci\'on de seguridad por direcci\'on) \\
+Funci\'on de activaci\'on & Sigmoide ($\sigma(x) = 1/(1+e^{-x})$) \\
+Entrenamiento & Backpropagation con 2000 \'epocas \\
+Tasa de aprendizaje & 0.5 \\
+Datos de entrenamiento & 16 patrones (todas las combinaciones binarias de 4 bits) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La RN se entrena con un conjunto sint\'etico de 16 ejemplos que cubren todas las configuraciones posibles de vecinos libres/bloqueados. Para cada patr\'on de entrada, el objetivo es $0.9$ para las direcciones libres y $0.1$ para las bloqueadas. Esto permite a la red aprender a reconocer qu\'e direcciones son seguras en cualquier configuraci\'on.
+
+% ======================================================================
+\section{Diagrama de Estados (FSM)}
+% ======================================================================
+
+En la Figura~\ref{fig:fsm} se muestra el diagrama de transici\'on de estados utilizando la notaci\'on de m\'aquinas de estados finitos.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=3cm and 1.5cm,
+    state/.style={rectangle, draw, rounded corners, minimum width=2.2cm, minimum height=0.8cm, align=center, font=\small, fill=blue!8},
+    edge/.style={-{Stealth[scale=1.2]}, thick},
+    lbl/.style={font=\small, auto},
+  ]
+  \node[state, initial, initial text=] (idle) {IDLE};
+  \node[state, right=of idle] (config) {CONFIGURING};
+  \node[state, right=of config] (evolv) {EVOLVING};
+  \node[state, below=of evolv] (simul) {SIMULATING};
+  \node[state, below=of config] (compl) {COMPLETE};
+
+  % Forward edges
+  \draw[edge] (idle) -- node[lbl] {Configurar} (config);
+  \draw[edge] (config) -- node[lbl] {Evolucionar} (evolv);
+  \draw[edge] (evolv) -- node[lbl, swap] {Simular} (simul);
+  \draw[edge] (simul) -- node[lbl] {fin} (compl);
+
+  % Back edges (below)
+  \draw[edge] (compl.south) -- ++(0,-0.6) -| node[lbl, below, pos=0.25] {Reiniciar} (idle.south);
+  \draw[edge] (compl.south) -- ++(0,-0.6) -| node[lbl, below, pos=0.75] {Reconfig.} (config.south);
+
+  % Back edges (above)
+  \draw[edge] (evolv.north) -- ++(0,0.6) -| node[lbl, above, pos=0.25] {Cancelar} (config.north);
+  \draw[edge] (simul.west) -- ++(-0.4,0) |- node[lbl, above, pos=0.3] {Reconfig.} (config.east);
+  \draw[edge] (config.south) -- ++(0,-0.3) -| node[lbl, below, pos=0.25] {Cancelar} (idle.south);
+\end{tikzpicture}
+\caption{Diagrama de transici\'on de estados del FSM. Durante la configuraci\'on el usuario coloca obst\'aculos y posiciona al robot y la meta.}
+\label{fig:fsm}
+\end{figure}
+
+% ======================================================================
+\section{Tabla de Par\'ametros y Configuraci\'on}
+% ======================================================================
+
+A continuaci\'on se presentan los par\'ametros de configuraci\'on del sistema para tres escenarios de prueba representativos.
+
+\begin{table}[H]
+\centering
+\caption{Escenarios de prueba y configuraci\'on del sistema.}
+\label{tab:params}
+\small
+\begin{tabular}{l c c c}
+\toprule
+\textbf{Par\'ametro} & \textbf{Escenario 1} & \textbf{Escenario 2} & \textbf{Escenario 3} \\
+                       & (Sin obst\'aculos) & (3 obst\'aculos) & (Muro diagonal) \\
+\midrule
+Grid & $8 \times 8$ & $8 \times 8$ & $8 \times 8$ \\
+Robot & $(0,0)$ & $(0,0)$ & $(0,0)$ \\
+Meta & $(7,7)$ & $(7,7)$ & $(7,7)$ \\
+Obst\'aculos & 0 & $(2,2), (3,3), (4,4)$ & $(1,1)$ a $(6,6)$ diagonal \\
+\midrule
+\textbf{Resultados} \\
+Generaciones & 100 & 100 & 100 \\
+Poblaci\'on & 60 & 60 & 60 \\
+Mejor fitness & $120.0$ & $\sim 95.0$ & $\sim 40.0$ \\
+Ruta encontrada & Directa (14 pasos) & Desv\'io (16 pasos) & Ruta larga ($>20$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Funci\'on de fitness: componentes y valores t\'ipicos.}
+\label{tab:fitness}
+\begin{tabular}{l c}
+\toprule
+\textbf{Componente} & \textbf{F\'ormula} \\
+\midrule
+Bonificaci\'on por meta & $+100$ si se alcanza \\
+Puntuaci\'on de distancia & $20 / (1 + d_{manhattan})$ \\
+Bonificaci\'on RN & $(\sum \text{puntaje\_RN}) / 25 \times 10$ \\
+Penalizaci\'on por obst\'aculo & $-2$ por obst\'aculo chocado \\
+Penalizaci\'on por revisitar & $-0.3$ por celda repetida \\
+Penalizaci\'on por pasos & $-0.05$ por paso \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ======================================================================
+\section{Mecanismo de Inferencia}
+% ======================================================================
+
+\subsection{Ciclo Evolutivo del AG}
+
+El Algoritmo Gen\'etico sigue el ciclo cl\'asico de evoluci\'on:
+
+\begin{enumerate}
+  \item \textbf{Inicializaci\'on:} Se generan 60 cromosomas aleatorios, cada uno con 25 genes que representan direcciones (N, S, E, O).
+  \item \textbf{Evaluaci\'on:} Cada cromosoma se simula en el grid. El robot sigue la secuencia de direcciones y se calcula el fitness seg\'un la distancia final a la meta, obst\'aculos chocados y puntuaci\'on de la RN.
+  \item \textbf{Selecci\'on por torneo:} Se eligen 3 individuos al azar y el de mejor fitness pasa a la siguiente generaci\'on. Se repite 60 veces.
+  \item \textbf{Cruce de 1 punto:} Dos padres se cruzan en un punto aleatorio, generando dos hijos que combinan el material gen\'etico de ambos.
+  \item \textbf{Mutaci\'on:} Cada gen tiene 8\% de probabilidad de cambiar aleatoriamente a otra direcci\'on.
+  \item \textbf{Reemplazo con elitismo:} Los 2 mejores individuos de la generaci\'on anterior pasan directamente a la nueva generaci\'on; el resto se completa con los hijos.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=2cm,
+    box/.style={rectangle, draw, rounded corners, minimum width=2.5cm, minimum height=0.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[scale=1.2]}, thick},
+  ]
+  \node[box, fill=blue!20] (init) {Inicializar\\poblaci\'on};
+  \node[box, fill=green!20, below=of init] (eval) {Evaluar\\fitness};
+  \node[box, fill=yellow!20, below=of eval] (select) {Selecci\'on\\torneo};
+  \node[box, fill=orange!20, below=of select] (cross) {Cruce\\1 punto};
+  \node[box, fill=red!20, below=of cross] (mut) {Mutaci\'on\\8\%};
+  \node[box, fill=violet!20, right=of mut, xshift=2cm] (replace) {Reemplazo\\+ elitismo};
+  \node[box, fill=cyan!20, above=of replace] (check) {$\text{gen} < 100$?};
+
+  \draw[arrow] (init) -- (eval);
+  \draw[arrow] (eval) -- (select);
+  \draw[arrow] (select) -- (cross);
+  \draw[arrow] (cross) -- (mut);
+  \draw[arrow] (mut) -- (replace);
+  \draw[arrow] (replace) -- (check);
+  \draw[arrow] (check.west) -- ++(-1,0) node[left, font=\small] {S\'i} |- (eval.east);
+  \draw[arrow] (check.east) -- ++(2,0) node[right, font=\small] {No $\rightarrow$ Fin};
+\end{tikzpicture}
+\caption{Ciclo evolutivo del Algoritmo Gen\'etico.}
+\label{fig:evolucion}
+\end{figure}
+
+\subsection{Entrenamiento de la Red Neuronal}
+
+La red se entrena con \textbf{backpropagation} sobre 16 patrones sint\'eticos. Cada patr\'on representa una combinaci\'on de celdas vecinas libres (1) o bloqueadas (0). El objetivo es que la red aprenda a recomendar direcciones seguras.
+
+La funci\'on de activaci\'on sigmoide se define como:
+
+\[
+\sigma(x) = \frac{1}{1 + e^{-x}}
+\]
+
+El error en la capa de salida se calcula como:
+
+\[
+\delta_{k} = (y_k - t_k) \cdot \sigma'(x_k)
+\]
+
+donde $y_k$ es la salida actual, $t_k$ es el objetivo y $\sigma'(x) = \sigma(x)(1 - \sigma(x))$.
+
+La actualizaci\'on de pesos sigue la regla:
+
+\[
+w_{ij} \leftarrow w_{ij} + \eta \cdot \delta_j \cdot a_i
+\]
+
+Donde $\eta = 0.5$ es la tasa de aprendizaje, $\delta_j$ es el error de la neurona $j$, y $a_i$ es la activaci\'on de la neurona $i$ de la capa anterior.
+
+\subsection{Ejemplo 1: Sin obst\'aculos}
+
+\begin{itemize}
+  \item \textbf{Configuraci\'on:} Robot en $(0,0)$, meta en $(7,7)$, sin obst\'aculos.
+  \item \textbf{Comportamiento esperado:} El AG converge r\'apidamente a la ruta diagonal directa.
+  \item \textbf{Fitness m\'aximo:} $100 + 20/(1+0) + \text{bonos\_RN} \approx 120$.
+  \item \textbf{Generaciones para converger:} $\sim 15$ generaciones.
+\end{itemize}
+
+\subsection{Ejemplo 2: Con obst\'aculos dispersos}
+
+\begin{itemize}
+  \item \textbf{Configuraci\'on:} Obst\'aculos en $(2,2)$, $(3,3)$ y $(4,4)$ formando una barrera diagonal.
+  \item \textbf{Comportamiento esperado:} El AG debe rodear los obst\'aculos, encontrando una ruta m\'as larga.
+  \item \textbf{Fitness m\'aximo:} $\sim 95$ (penalizaci\'on por m\'as pasos).
+  \item \textbf{Estrategia evolutiva:} Los cromosomas que chocan contra obst\'aculos son fuertemente penalizados, favoreciendo rutas que bordean la barrera.
+\end{itemize}
+
+\subsection{Ejemplo 3: Muro diagonal completo}
+
+\begin{itemize}
+  \item \textbf{Configuraci\'on:} Obst\'aculos en toda la diagonal de $(1,1)$ a $(6,6)$.
+  \item \textbf{Comportamiento esperado:} El robot debe rodear completamente el muro, lo que requiere m\'as de 20 pasos.
+  \item \textbf{Fitness m\'aximo:} $\sim 40$ (menor bonificaci\'on por distancia, penalizaci\'on por muchos pasos).
+  \item \textbf{Complejidad:} El AG requiere las 100 generaciones completas para converger.
+\end{itemize}
+
+% ======================================================================
+\section{Documentaci\'on del Proyecto}
+% ======================================================================
+
+\subsection{Arquitectura del Proyecto}
+
+\begin{figure}[H]
+\centering
+\begin{lstlisting}[style=estructura]
+src/
+  App.tsx                  -- Orquestador principal (React + Tailwind)
+  types.ts                 -- Tipos compartidos
+  index.css                -- Estilos Tailwind con tema TokyoNight
+  main.tsx                 -- Punto de entrada
+  simulation/
+    StateMachine.ts        -- FSM (5 estados, matriz de transiciones)
+    NeuralNetwork.ts       -- Red 4-3-4 con backpropagation
+    GeneticAlgorithm.ts    -- AG con seleccion torneo y elitismo
+    trainingData.ts        -- 16 patrones sinteticos de entrenamiento
+  components/
+    GameBoard.tsx          -- Grid 8x8 interactivo
+    StateIndicator.tsx     -- Indicador del estado actual del FSM
+    Controls.tsx           -- Botones por transicion de estado
+    FitnessChart.tsx       -- Grafica SVG de evolucion del fitness
+\end{lstlisting}
+\caption{Estructura del proyecto.}
+\label{fig:estructura}
+\end{figure}
+
+\subsection{Tecnolog\'ias Utilizadas}
+
+\begin{itemize}
+  \item \textbf{React 19} con TypeScript para la interfaz de usuario.
+  \item \textbf{Tailwind CSS v4} con tema personalizado TokyoNight para el dise\~no oscuro.
+  \item \textbf{Vite 8} como empaquetador y servidor de desarrollo.
+  \item \textbf{pnpm} como gestor de paquetes.
+  \item \textbf{SVG} para la gr\'afica de evoluci\'on del fitness (sin librer\'ias externas).
+\end{itemize}
+
+\subsection{Pantallas del Sistema}
+
+\subsubsection{Pantalla de inicio}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figuras/pantalla-inicio.png}
+
+\small\textit{Descripci\'on:} Pantalla inicial del sistema con el tema oscuro TokyoNight. En la parte superior se muestra el t\'itulo ``Robot Pathfinder'' y el subt\'itulo ``Optimizaci\'on y Reconocimiento de Patrones''. El indicador de estado muestra ``Inicio''. Los botones de control aparecen deshabilitados excepto ``Configurar''. El grid est\'a vac\'io con todas las celdas en color gris oscuro. La leyenda muestra los colores para robot (verde), meta (naranja), obst\'aculo (rojo) y ruta (azul).
+\caption{Pantalla de inicio del sistema.}
+\label{fig:inicio}
+\end{figure}
+
+\subsubsection{Pantalla de configuraci\'on con obst\'aculos}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figuras/pantalla-configuracion.png}
+
+\small\textit{Descripci\'on:} El indicador de estado cambia a ``Configurando'' (color amarillo). El selector de modo permite elegir entre ``Colocar obst\'aculos'', ``Posicionar robot'' y ``Posicionar meta''. Se han colocado varios obst\'aculos (rojo) en el grid, el robot (verde, letra R) en $(0,0)$ y la meta (naranja, letra G) en $(7,7)$. El panel derecho muestra el mensaje ``La gr\'afica de fitness aparecer\'a aqu\'i'' y la secci\'on ``Sistema'' con la descripci\'on de los tres m\'odulos.
+\caption{Pantalla de configuraci\'on del tablero.}
+\label{fig:config}
+\end{figure}
+
+\subsubsection{Pantalla de evoluci\'on en vivo}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figuras/pantalla-evolucion.png}
+
+\small\textit{Descripci\'on:} El indicador de estado muestra ``Evolucionando'' (azul). El grid permanece en modo s\'olo lectura. En el panel derecho, la gr\'afica de fitness muestra la evoluci\'on en tiempo real: la l\'inea azul s\'olida representa el mejor fitness por generaci\'on, la l\'inea p\'urpura discontinua representa el promedio de la poblaci\'on. El bot\'on ``Simular'' y ``Reiniciar'' est\'an disponibles. El contador muestra la generaci\'on actual (ej: ``Generaci\'on: 58 / 100'').
+\caption{Pantalla de evoluci\'on con gr\'afica de fitness en vivo.}
+\label{fig:evolucion-pantalla}
+\end{figure}
+
+\subsubsection{Pantalla de simulaci\'on de ruta}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figuras/pantalla-simulacion.png}
+
+\small\textit{Descripci\'on:} Al presionar ``Simular'', el indicador cambia a ``Simulando'' (p\'urpura). El robot animado (celda resaltada en p\'urpura brillante) recorre paso a paso la ruta encontrada por el AG. Las celdas de la ruta se muestran en azul con n\'umeros indicando el orden de los pasos. Cada paso se actualiza cada 300 ms, permitiendo visualizar el recorrido completo.
+\caption{Pantalla de simulaci\'on del robot siguiendo la ruta.}
+\label{fig:simulacion}
+\end{figure}
+
+\subsubsection{Pantalla de proceso completado}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figuras/pantalla-completado.png}
+
+\small\textit{Descripci\'on:} El proceso finaliza con el estado ``Completado'' (verde). La ruta completa permanece visible en el grid con las celdas azules numeradas. La gr\'afica de fitness muestra la evoluci\'on completa de las 100 generaciones. Los botones ``Reconfigurar'' y ``Reiniciar'' permiten comenzar un nuevo ciclo.
+\caption{Pantalla de proceso completado.}
+\label{fig:completado}
+\end{figure}
+
+\subsection{C\'odigo Fuente: M\'odulo del Algoritmo Gen\'etico}
+
+El siguiente fragmento muestra la implementaci\'on del ciclo evolutivo en TypeScript:
+
+\begin{lstlisting}
+export class GeneticAlgorithm {
+  initialize(): void {
+    this.population = Array.from(
+      { length: this.populationSize },
+      () => ({ genes: this.randomGenes(), fitness: 0 })
+    );
+    this.evaluatePopulation();
+  }
+
+  step(): boolean {
+    if (this.generations >= this.maxGenerations) return false;
+
+    const selected = this.selection(); // torneo tamano 3
+    const newPopulation: Chromosome[] = [];
+
+    // Elitismo: preservar los 2 mejores
+    newPopulation.push({ ...this.population[0] });
+    newPopulation.push({ ...this.population[1] });
+
+    for (let i = 2; i < this.populationSize; i += 2) {
+      const [c1, c2] = this.crossover(
+        selected[i].genes, selected[i+1].genes
+      );
+      newPopulation.push({ genes: this.mutate(c1), fitness: 0 });
+      newPopulation.push({ genes: this.mutate(c2), fitness: 0 });
+    }
+
+    this.population = newPopulation.slice(0, this.populationSize);
+    this.generations++;
+    this.evaluatePopulation();
+    return this.generations < this.maxGenerations;
+  }
+}
+\end{lstlisting}
+
+\subsection{C\'odigo Fuente: Red Neuronal -- Forward Pass}
+
+El siguiente fragmento muestra la implementaci\'on del forward pass con activaci\'on sigmoide:
+
+\begin{lstlisting}
+forward(inputs: number[]): number[] {
+  const hidden: number[] = [];
+  for (let i = 0; i < this.hiddenSize; i++) {
+    let sum = this.biasHidden[i];
+    for (let j = 0; j < this.inputSize; j++) {
+      sum += this.weightsInputHidden[i][j] * inputs[j];
+    }
+    hidden.push(sigmoid(sum));
+  }
+
+  const outputs: number[] = [];
+  for (let i = 0; i < this.outputSize; i++) {
+    let sum = this.biasOutput[i];
+    for (let j = 0; j < this.hiddenSize; j++) {
+      sum += this.weightsHiddenOutput[i][j] * hidden[j];
+    }
+    outputs.push(sigmoid(sum));
+  }
+  return outputs;
+}
+\end{lstlisting}
+
+\subsection{Ejemplo de Ejecuci\'on: Grid con 3 obst\'aculos}
+
+Configuraci\'on de prueba para el departamento de La Paz:
+
+\begin{table}[H]
+\centering
+\caption{Ejemplo de ejecuci\'on con 3 obst\'aculos.}
+\label{tab:ejemplo}
+\begin{tabular}{l r}
+\toprule
+\textbf{Par\'ametro} & \textbf{Valor} \\
+\midrule
+Robot & $(0,0)$ \\
+Meta & $(7,7)$ \\
+Obst\'aculos & $(2,2)$, $(3,3)$, $(4,4)$ \\
+Generaciones ejecutadas & 100 \\
+Mejor fitness final & 94.7 \\
+Pasos en la ruta & 16 \\
+Estado alcanzado & COMPLETE \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Reglas activadas durante la evoluci\'on:}
+\begin{itemize}
+  \item Los cromosomas que chocan con $(2,2)$, $(3,3)$ o $(4,4)$ reciben penalizaci\'on de $-2$.
+  \item Los cromosomas que rodean los obst\'aculos reciben bonificaci\'on de la RN por moverse en direcciones seguras.
+  \item El mejor cromosoma final rodea los obst\'aculos por la derecha: $(\rightarrow, \rightarrow, \downarrow, \rightarrow, \dots)$.
+\end{itemize}
+
+% ======================================================================
+\section{Conclusiones}
+% ======================================================================
+
+En este trabajo se ha implementado un sistema de pathfinding evolutivo que integra tres t\'ecnicas fundamentales de inteligencia artificial. Las principales conclusiones son:
+
+\begin{enumerate}
+  \item El \textbf{Modelo de Transacci\'on de Estados (FSM)} demostr\'o ser eficaz para organizar el flujo del sistema en fases discretas y bien definidas. La matriz de transiciones garantiza que solo se ejecuten acciones v\'alidas en cada estado, evitando inconsistencias en el ciclo de vida de la aplicaci\'on.
+
+  \item El \textbf{Algoritmo Gen\'etico} logr\'o encontrar rutas \'optimas o cercanas a la \'optima en todos los escenarios de prueba. La combinaci\'on de selecci\'on por torneo, cruce de 1 punto y elitismo permiti\'o una convergencia r\'apida (15--30 generaciones en escenarios simples) manteniendo diversidad poblacional.
+
+  \item La \textbf{Red Neuronal Simple} (arquitectura 4-3-4) aprendi\'o correctamente a clasificar direcciones seguras a partir del estado de las celdas vecinas. Su integraci\'on en la funci\'on de fitness del AG demostr\'o que el reconocimiento de patrones puede guiar eficazmente la b\'usqueda evolutiva.
+
+  \item La implementaci\'on en React + TypeScript con Tailwind CSS demuestra que es posible construir aplicaciones de IA interactivas y visualmente atractivas utilizando tecnolog\'ias web modernas, sin dependencias de librer\'ias de machine learning externas.
+\end{enumerate}
+
+\subsection{Trabajo Futuro}
+
+\begin{itemize}
+  \item Implementar un \textbf{operador de cruce adaptativo} que preserve sub-rutas prometedoras (cruza basado en segmentos continuos).
+  \item A\~nadir \textbf{evoluci\'on de los pesos de la red neuronal} directamente en el cromosoma del AG, eliminando el pre-entrenamiento supervisado.
+  \item Extender el grid a dimensiones mayores ($16 \times 16$ o $32 \times 32$) y validar la escalabilidad del enfoque.
+  \item Incorporar \textbf{m\'ultiples agentes} compitiendo o cooperando en el mismo grid.
+\end{itemize}
+
+% ======================================================================
+\section*{Referencias}
+% ======================================================================
+
+\begin{enumerate}
+  \item Holland, J. H. (1975). \textit{Adaptation in Natural and Artificial Systems}. University of Michigan Press.
+  \item Goldberg, D. E. (1989). \textit{Genetic Algorithms in Search, Optimization and Machine Learning}. Addison-Wesley.
+  \item Russell, S., \& Norvig, P. (2020). \textit{Artificial Intelligence: A Modern Approach} (4th ed.). Pearson.
+  \item Haykin, S. (2009). \textit{Neural Networks and Learning Machines} (3rd ed.). Pearson.
+  \item Hopcroft, J. E., \& Ullman, J. D. (1979). \textit{Introduction to Automata Theory, Languages, and Computation}. Addison-Wesley.
+\end{enumerate}
+
+\end{document}

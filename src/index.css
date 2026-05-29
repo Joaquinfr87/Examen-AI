@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-tokyo-bg: #1a1b26;
+  --color-tokyo-surface: #24283b;
+  --color-tokyo-surface2: #1f2335;
+  --color-tokyo-border: #3b4261;
+  --color-tokyo-fg: #c0caf5;
+  --color-tokyo-blue: #7aa2f7;
+  --color-tokyo-purple: #bb9af7;
+  --color-tokyo-cyan: #7dcfff;
+  --color-tokyo-green: #9ece6a;
+  --color-tokyo-red: #f7768e;
+  --color-tokyo-orange: #ff9e64;
+  --color-tokyo-yellow: #e0af68;
+}
+
+body {
+  background: #1a1b26;
+  color: #c0caf5;
+}
